@@ -1,0 +1,21 @@
+# Web Framework & Server
+fastapi
+uvicorn[standard]
+
+# Machine Learning & Data
+numpy<2.0.0
+scikit-surprise
+pandas
+
+# Database ORM & Connector
+SQLAlchemy
+psycopg2-binary  # SQLAlchemy uses this driver to communicate with PostgreSQL
+
+# Configuration
+python-dotenv
+
+# Password Hashing
+bcrypt
+
+# Data Generation for Seeding
+Faker
