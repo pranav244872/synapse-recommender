@@ -1,11 +1,18 @@
 # app/main.py
 
+from dotenv import load_dotenv
+
+# Load env variables
+load_dotenv()
+
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import api_key
 
 from .engine import RecommendationEngine
 from .schemas import RecommendationRequest, RecommendationResponse
+from .security import get_api_key
 
 # --- App Configuration ---
 logging.basicConfig(level=logging.INFO)
@@ -52,10 +59,15 @@ def health_check():
 
 
 @app.post("/recommend", response_model=RecommendationResponse)
-async def recommend_engineers(request: RecommendationRequest):
+async def recommend_engineers(
+    request: RecommendationRequest,
+    api_key: str = Depends(get_api_key)    
+):
     """
     Accepts a list of required skill IDs and returns a ranked list of
     recommended engineers.
+
+    This endpoint is protected and requires a Valid API Key
     """
     engine = lifespan_context.get("engine")
     if not engine or not engine.model:
