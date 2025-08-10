@@ -4,12 +4,6 @@ RUN apt update && apt install -y \
     curl git unzip ripgrep fd-find build-essential python3-dev \
     && apt clean
 
-RUN curl -L -o nvim-linux64.tar.gz https://github.com/neovim/neovim/releases/download/v0.11.2/nvim-linux-x86_64.tar.gz \
-    && tar xzf nvim-linux64.tar.gz \
-    && mv nvim-linux-x86_64 /opt/nvim \
-    && ln -s /opt/nvim/bin/nvim /usr/local/bin/nvim \
-    && rm nvim-linux64.tar.gz
-
 RUN adduser --disabled-password --gecos '' devuser && \
     chown -R devuser:devuser /home/devuser
 
