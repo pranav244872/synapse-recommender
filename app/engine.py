@@ -24,11 +24,15 @@ class RecommendationEngine:
 
     def __init__(self):
         logging.info("Initializing RecommendationEngine...")
+        self.refresh_model() # Initial training on startup
+
+    def refresh_model(self):
+        logging.info("Refreshing the recommendation model...")
         # The data loader now provides the dynamically weighted ratings
         self.ratings_df, self.available_user_ids, self.actual_ratings_map = load_data_for_engine()
 
         if self.ratings_df.empty:
-            logging.error("Ratings data is empty. Engine cannot be initialized.")
+            logging.error("Ratings data is empty. Model cannot be trained.")
             self.model = None
             return
 
@@ -45,7 +49,7 @@ class RecommendationEngine:
         for user_id, skill_id in self.actual_ratings_map.keys():
             self.user_skills_map[user_id].add(skill_id)
 
-        logging.info("RecommendationEngine initialized and model trained successfully.")
+        logging.info("Recommendation model has been refreshed successfully.")
 
     def get_recommendations(self, skill_ids: List[int], limit: int) -> List[Dict[str, Any]]:
         if not self.model:

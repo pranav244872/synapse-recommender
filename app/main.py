@@ -85,3 +85,29 @@ async def recommend_engineers(
         return {"recommendations": []}
 
     return {"recommendations": recommendations}
+
+@app.post("/refresh-model", status_code=202)
+async def trigger_model_refresh(api_key: str = Depends(get_api_key)):
+    """
+    Triggers a refresh of the recommendation model.
+    This should be called by other internal services (e.g., the user service)
+    after a new user is created or a task is completed.
+    """
+    engine = lifespan_context.get("engine")
+    if not engine:
+        raise HTTPException(
+            status_code=503,
+            detail="Recommendation engine is not available."
+        )
+    
+    try:
+        # In a production system, you might run this in the background
+        # to avoid blocking the API response.
+        engine.refresh_model()
+        return {"status": "accepted", "message": "Model refresh initiated."}
+    except Exception as e:
+        logging.error(f"Failed to trigger model refresh: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while refreshing the model."
+        )
