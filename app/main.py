@@ -1,6 +1,8 @@
 # app/main.py
 
 from dotenv import load_dotenv
+import os
+import psycopg2
 
 # Load env variables
 load_dotenv()
@@ -18,7 +20,6 @@ from .security import get_api_key
 logging.basicConfig(level=logging.INFO)
 
 # --- Lifespan Event Handler ---
-# This dictionary will hold our long-lived engine instance.
 lifespan_context = {}
 
 @asynccontextmanager
@@ -32,7 +33,7 @@ async def lifespan(app: FastAPI):
         logging.critical(f"Engine initialization failed: {e}")
         lifespan_context["engine"] = None
     
-    yield # The application runs while the lifespan block is yielded
+    yield
     
     # Code here runs on shutdown
     logging.info("Shutting down...")
@@ -51,23 +52,60 @@ app = FastAPI(
 
 @app.get("/health", status_code=200)
 def health_check():
-    """Simple health check to confirm the service is running."""
+    """
+    Checks the status of the service, including the recommendation model
+    and the database connection.
+    """
     engine = lifespan_context.get("engine")
-    if engine and engine.model:
-        return {"status": "ok", "model_ready": True}
-    return {"status": "degraded", "model_ready": False}
+    model_ready = bool(engine and engine.model)
+    db_ok = False
+    db_error = "Not checked"
 
+    try:
+        db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            raise ValueError("DATABASE_URL environment variable not set.")
+        
+        # Try to connect to the database
+        conn = psycopg2.connect(db_url)
+        # Run a simple query to ensure the connection is live
+        conn.cursor().execute("SELECT 1")
+        conn.close()
+        db_ok = True
+        db_error = None
+
+    except Exception as e:
+        logging.error(f"Database health check failed: {e}")
+        db_error = str(e)
+        db_ok = False
+
+    if model_ready and db_ok:
+        return {
+            "status": "ok",
+            "details": {"model_ready": True, "database_connected": True},
+        }
+    else:
+        # Return a 503 Service Unavailable status if anything is wrong
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "degraded",
+                "details": {
+                    "model_ready": model_ready,
+                    "database_connected": db_ok,
+                    "database_error": db_error,
+                },
+            },
+        )
 
 @app.post("/recommend", response_model=RecommendationResponse)
 async def recommend_engineers(
     request: RecommendationRequest,
-    api_key: str = Depends(get_api_key)    
+    api_key: str = Depends(get_api_key)  
 ):
     """
     Accepts a list of required skill IDs and returns a ranked list of
     recommended engineers.
-
-    This endpoint is protected and requires a Valid API Key
     """
     engine = lifespan_context.get("engine")
     if not engine or not engine.model:
@@ -90,8 +128,6 @@ async def recommend_engineers(
 async def trigger_model_refresh(api_key: str = Depends(get_api_key)):
     """
     Triggers a refresh of the recommendation model.
-    This should be called by other internal services (e.g., the user service)
-    after a new user is created or a task is completed.
     """
     engine = lifespan_context.get("engine")
     if not engine:
@@ -101,8 +137,6 @@ async def trigger_model_refresh(api_key: str = Depends(get_api_key)):
         )
     
     try:
-        # In a production system, you might run this in the background
-        # to avoid blocking the API response.
         engine.refresh_model()
         return {"status": "accepted", "message": "Model refresh initiated."}
     except Exception as e:
